@@ -4,7 +4,8 @@ var bcrypt = require('bcrypt');
 const Joi = require('joi'); 
 var jwt = require('jsonwebtoken');
 
-const JWT_SECRET = 'secret'
+var CONSTANT = require('../config/constant.js');
+const JWT_SECRET = CONSTANT.JWT_SECRET;
 
 const Sequelize = require('sequelize');
 const Op = Sequelize.Op;
@@ -12,6 +13,7 @@ const Op = Sequelize.Op;
 exports.create = async(req, res) => {
   const saltRounds = 10;
   const pass =  await  bcrypt.hash(req.body.password, saltRounds);
+  let isError = false;
   
   let message='';
   let data={};
@@ -30,6 +32,8 @@ exports.create = async(req, res) => {
   if(error != null)
   {
     message = error.details[0].message.replace(/"/g,'');
+    isError = true;
+ 
   }else{
         try{
 
@@ -59,11 +63,14 @@ exports.create = async(req, res) => {
         catch(exp)
         {
           message = exp.message;
+          isError = true;
         }
      
     }
 
-    res.send({
+    let statusCode = isError?"400":"200";
+
+    res.status(statusCode).send({
       data,
       "message":message
     });
@@ -74,6 +81,7 @@ exports.login = async (req, res) => {
   let message='';
   let jwtoken='';
   let data={};
+  let statusCode ="200";
   
   /*input validation*/
   const schema = Joi.object({
@@ -84,6 +92,7 @@ exports.login = async (req, res) => {
 
   if(error != null){
     message = error.details[0].message.replace(/"/g,'');
+    statusCode = "400";
   }else{
     const saltRounds = 10;
     const userPassword = req.body.password;
@@ -105,18 +114,16 @@ exports.login = async (req, res) => {
     {
         jwtoken =  jwt.sign({exp: Math.floor(Date.now() / 1000) + (60 * 60),data: tokenData}, JWT_SECRET);
         data={
-          "loginToken":jwtoken
+          "accessToken":jwtoken
         }
-        //check decrypt
-        //var decoded = jwt.verify(jwtoken, JWT_SECRET);
-        //console.log(decoded);
     }
 
     message = passwordMatches?"login Successfull" :"Username or password does not match";
+    statusCode= passwordMatches?"200" :"401";
   }
 
   //send response
-  res.send({
+  res.status(statusCode).send({
       data,
       "message":message
   })
@@ -127,6 +134,8 @@ exports.userList = async (req,res)=>{
   let perPage =5;
   let message='';
   let condition={};
+  let statusCode="200";
+
   //input
   const fName = req.query.firstName ? req.query.firstName:''; 
   const lName = req.query.lastName ? req.query.lastName:'';
@@ -202,8 +211,12 @@ exports.userList = async (req,res)=>{
 
    data = await tblUser.findAll(condition);
    message =  "Total " + data.length + " record(s) found !"  
+ 
+   //statusCode = data.length > 0 ? "200":"204"
 
-  res.send({
+   statusCode = data.length > 0 ? "200":"200"
+
+  res.status(statusCode).send({
     data,
     "message":message
   });
